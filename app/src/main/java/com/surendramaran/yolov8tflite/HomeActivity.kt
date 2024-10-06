@@ -11,6 +11,8 @@ import androidx.core.view.WindowInsetsCompat
 import yolov8tflite.R
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -28,6 +30,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var recognizerIntent: Intent
     private val RECORD_REQUEST_CODE = 101
+    private var isActivityActive = true
 
     private var currentToast: Toast? = null
 
@@ -112,6 +115,9 @@ class HomeActivity : AppCompatActivity() {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, this@HomeActivity.packageName)
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             }
 
             speechRecognizer.setRecognitionListener(object : RecognitionListener {
@@ -120,58 +126,37 @@ class HomeActivity : AppCompatActivity() {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
+
                 override fun onEndOfSpeech() {
-                    speechRecognizer.stopListening()
-                    speechRecognizer.startListening(recognizerIntent)
+                    if (isActivityActive) {
+                        speechRecognizer.stopListening()
+                        speechRecognizer.startListening(recognizerIntent)
+                    }
                 }
 
                 override fun onError(error: Int) {
-                    speechRecognizer.startListening(recognizerIntent)
+                    if (isActivityActive) {
+                        speechRecognizer.startListening(recognizerIntent)
+                    }
                 }
 
                 override fun onResults(results: Bundle?) {
                     cancelCurrentToast()
-
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     matches?.let {
                         val recognizedText = it[0]
-                        // showToast("Full: $recognizedText")
                     }
-                    speechRecognizer.startListening(recognizerIntent)
+                    if (isActivityActive) {
+                        speechRecognizer.startListening(recognizerIntent)
+                    }
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
                     cancelCurrentToast()
-
                     val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     matches?.let {
                         val partialText = it[0]
-                        // showToast("$partialText")
-
-                        if (partialText.contains("start", ignoreCase = true)) {
-                            speak("Start!")
-                            move.performClick()
-                            speechRecognizer.stopListening()
-                            speechRecognizer.startListening(recognizerIntent)
-                        } else if (partialText.contains("hello", ignoreCase = true)) {
-                            speak("Hi!")
-                            speechRecognizer.stopListening()
-                            speechRecognizer.startListening(recognizerIntent)
-                        } else if (partialText.contains("hi", ignoreCase = true)) {
-                            speak("Hello!")
-                            speechRecognizer.stopListening()
-                            speechRecognizer.startListening(recognizerIntent)
-                        } else if (partialText.contains("hep hep", ignoreCase = true)) {
-                            speak("Hooray!")
-                            speechRecognizer.stopListening()
-                            speechRecognizer.startListening(recognizerIntent)
-                        } else if (partialText.contains("hooray", ignoreCase = true)) {
-                            speak("Hephep!")
-                            speechRecognizer.stopListening()
-                            speechRecognizer.startListening(recognizerIntent)
-                        } else {
-
-                        }
+                        handlePartialSpeech(partialText)
                     }
                 }
             })
@@ -180,6 +165,27 @@ class HomeActivity : AppCompatActivity() {
 
         } catch (e: Exception) {
             showToast("Error initializing SpeechRecognizer: ${e.message}")
+        }
+    }
+
+    private fun handlePartialSpeech(partialText: String) {
+        when {
+            partialText.contains("start", ignoreCase = true) -> {
+                speak("Start!")
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    move.performClick()
+                }, 500)
+            }
+            partialText.contains("hello", ignoreCase = true) -> speak("Hi!")
+            partialText.contains("hi", ignoreCase = true) -> speak("Hello!")
+            partialText.contains("hep hep", ignoreCase = true) -> speak("Hooray!")
+            partialText.contains("hooray", ignoreCase = true) -> speak("Hephep!")
+            partialText.contains("ready", ignoreCase = true) -> speak("Ready!")
+        }
+        speechRecognizer.stopListening()
+        if (isActivityActive) {
+            speechRecognizer.startListening(recognizerIntent)
         }
     }
 
@@ -205,12 +211,31 @@ class HomeActivity : AppCompatActivity() {
         currentToast = null
     }
 
+    override fun onPause() {
+        super.onPause()
+        isActivityActive = false
+        if (this::speechRecognizer.isInitialized) {
+            speechRecognizer.stopListening()
+            speechRecognizer.cancel()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isActivityActive = true
+        if (this::speechRecognizer.isInitialized) {
+            startSpeechToText()
+        }
+    }
+
     override fun onDestroy() {
         if (this::textToSpeech.isInitialized) {
             textToSpeech.stop()
             textToSpeech.shutdown()
         }
+        if (this::speechRecognizer.isInitialized) {
+            speechRecognizer.destroy()
+        }
         super.onDestroy()
-        speechRecognizer.destroy()
     }
 }
