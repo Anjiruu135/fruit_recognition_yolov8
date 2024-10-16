@@ -428,6 +428,21 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
             partialText.contains("hep hep", ignoreCase = true) -> speak("Hooray!")
             partialText.contains("hooray", ignoreCase = true) -> speak("Hephep!")
             partialText.contains("ready", ignoreCase = true) -> speak("Ready!")
+            partialText.contains("apple", ignoreCase = true) -> {
+                countAndSpeakFruitConditions("apple")
+            }
+            partialText.contains("banana", ignoreCase = true) -> {
+                countAndSpeakFruitConditions("banana")
+            }
+            partialText.contains("mango", ignoreCase = true) -> {
+                countAndSpeakFruitConditions("mango")
+            }
+            partialText.contains("orange", ignoreCase = true) -> {
+                countAndSpeakFruitConditions("orange")
+            }
+            partialText.contains("tomato", ignoreCase = true) -> {
+                countAndSpeakFruitConditions("tomato")
+            }
         }
         speechRecognizer.stopListening()
         if (isActivityActive) {
